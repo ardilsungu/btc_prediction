@@ -1,0 +1,9 @@
+# ── Veri dosyaları (Google Drive üzerinden paylaşılacak) ──────
+data/
+
+# ── Python ────────────────────────────────────────────────────
+__pycache__/
+
+# ── OS & IDE ──────────────────────────────────────────────────
+.DS_Store
+.vscode/
