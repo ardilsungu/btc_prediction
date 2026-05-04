@@ -2,9 +2,7 @@ import pandas as pd
 import numpy as np
 from pathlib import Path
 
-# ──────────────────────────────────────────────────────────────
-# Her zaman dilimine göre threshold varsayılanları
-# ──────────────────────────────────────────────────────────────
+
 TIMEFRAME_CONFIG = {
     '15m': {'threshold': 0.15},
     '1h':  {'threshold': 0.30},
@@ -31,9 +29,7 @@ class DataProcessor:
         self.threshold = threshold if threshold is not None else TIMEFRAME_CONFIG[timeframe]['threshold']
         self.df        = None
 
-    # ──────────────────────────────────────────────────────────
-    # 1. VERİ YÜKLEME & TEMİZLEME
-    # ──────────────────────────────────────────────────────────
+  
     def load_and_clean_data(self) -> pd.DataFrame:
         """Ham veriyi yükler, tiplerini düzeltir ve gereksiz kolonları atar."""
         self.df = pd.read_csv(self.file_path)
@@ -61,9 +57,7 @@ class DataProcessor:
               f"({self.df.index[0].date()} → {self.df.index[-1].date()})")
         return self.df
 
-    # ──────────────────────────────────────────────────────────
-    # 2. HEDEF DEĞİŞKEN
-    # ──────────────────────────────────────────────────────────
+
     def create_target(self) -> pd.DataFrame:
         """
         3 sınıflı hedef değişken oluşturur:
@@ -92,22 +86,19 @@ class DataProcessor:
 
         return self.df
 
-    # ──────────────────────────────────────────────────────────
-    # 3. TAM PIPELINE
-    # ──────────────────────────────────────────────────────────
     def run_pipeline(self, save: bool = True, output_dir: str = 'data/processing') -> pd.DataFrame:
         """
         Dosya zaten işlenmişse diskten okur, yoksa işleyip kaydeder.
         """
         out_path = Path(output_dir) / f"btc_{self.timeframe}_processed.csv"
 
-        # Zaten varsa işleme, direkt oku
+       
         if out_path.exists():
             print(f"[{self.timeframe}] Zaten mevcut, okunuyor → {out_path}")
             self.df = pd.read_csv(out_path, index_col='Open time', parse_dates=True)
             return self.df
 
-        # Yoksa işle ve kaydet
+       
         self.load_and_clean_data()
         self.create_target()
 
