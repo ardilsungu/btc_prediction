@@ -167,7 +167,7 @@ def add_volume_features(df: pd.DataFrame, cfg: dict) -> pd.DataFrame:
 
 
 # ──────────────────────────────────────────────────────────────
-# 7) MUM YAPISI
+# 
 # ──────────────────────────────────────────────────────────────
 def add_candle_features(df: pd.DataFrame) -> pd.DataFrame:
     candle_range = (df['High'] - df['Low']).replace(0, np.nan)
@@ -178,7 +178,7 @@ def add_candle_features(df: pd.DataFrame) -> pd.DataFrame:
 
 
 # ──────────────────────────────────────────────────────────────
-# 8) LAG ÖZELLİKLERİ
+#
 # ──────────────────────────────────────────────────────────────
 def add_lag_features(df: pd.DataFrame) -> pd.DataFrame:
     for lag in [1, 2, 3, 4, 5]:
