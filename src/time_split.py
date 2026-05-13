@@ -13,18 +13,18 @@ import argparse
 import pandas as pd
 from pathlib import Path
 
-# Proje koku: src/ -> BTC_PREDICTION/
+
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 FEATURE_DIR = PROJECT_ROOT / 'data' / 'feature_engineering'
 SPLIT_DIR   = PROJECT_ROOT / 'data' / 'splits'
 
-# Desteklenen timeframe'ler
+
 TIMEFRAMES = ['15m', '1h', '4h', '1d']
 
 
 # --------------------------------------------------------------
-# CEKIRDEK FONKSIYON
+# 
 # --------------------------------------------------------------
 def time_based_split(
     df: pd.DataFrame,
@@ -48,26 +48,26 @@ def time_based_split(
     -------
     (train_df, val_df, test_df) : Uc ayri DataFrame.
     """
-    # Tarihe gore sirala
+    
     df = df.sort_values('Open time').reset_index(drop=True)
 
     n = len(df)
     train_end = int(n * train_ratio)
     val_end   = int(n * (train_ratio + val_ratio))
 
-    # Ham bolme
+  
     train_df = df.iloc[:train_end].copy()
     val_df   = df.iloc[train_end:val_end].copy()
     test_df  = df.iloc[val_end:].copy()
 
-    # Purging: sinir bolgelerindeki satirlari sil (data leakage onleme)
+    
     if purge_rows > 0:
-        # Train'in son purge_rows satirini sil
+      
         train_df = train_df.iloc[:-purge_rows].copy()
-        # Validation'in son purge_rows satirini sil
+       
         val_df = val_df.iloc[:-purge_rows].copy()
 
-    # Index resetle
+    
     train_df = train_df.reset_index(drop=True)
     val_df   = val_df.reset_index(drop=True)
     test_df  = test_df.reset_index(drop=True)
@@ -76,7 +76,7 @@ def time_based_split(
 
 
 # --------------------------------------------------------------
-# RAPORLAMA
+# RAPOR
 # --------------------------------------------------------------
 def _print_split_report(name: str, df: pd.DataFrame) -> None:
     """Bir split setinin ozetini basar."""
@@ -112,7 +112,7 @@ def print_full_report(
     _print_split_report('TEST',       test_df)
     print(f"{'-'*90}")
 
-    # Leakage kontrolu
+    
     train_end = pd.to_datetime(train_df['Open time'].iloc[-1])
     val_start = pd.to_datetime(val_df['Open time'].iloc[0])
     val_end   = pd.to_datetime(val_df['Open time'].iloc[-1])
@@ -143,29 +143,29 @@ def split_timeframe(timeframe: str, force: bool = False) -> None:
         print(f"  Once feature engineering calistirin.")
         return
 
-    # Cikti dosyalari
+   
     out_train = SPLIT_DIR / f'{timeframe}_train.csv'
     out_val   = SPLIT_DIR / f'{timeframe}_val.csv'
     out_test  = SPLIT_DIR / f'{timeframe}_test.csv'
 
-    # Zaten mevcutsa ve force degilse atla
+   
     if all(p.exists() for p in [out_train, out_val, out_test]) and not force:
         print(f"[{timeframe}] Split dosyalari zaten mevcut, atlaniyor.")
         print(f"  (Yeniden bolmek icin --force kullanin)")
         return
 
-    # Yukle
+   
     print(f"\n[{timeframe}] Feature dosyasi okunuyor: {input_path}")
     df = pd.read_csv(input_path)
     print(f"[{timeframe}] Toplam satir: {len(df):,}")
 
-    # Split
+   
     train_df, val_df, test_df = time_based_split(df)
 
-    # Rapor
+    
     print_full_report(timeframe, train_df, val_df, test_df)
 
-    # Kaydet
+    
     SPLIT_DIR.mkdir(parents=True, exist_ok=True)
 
     train_df.to_csv(out_train, index=False)

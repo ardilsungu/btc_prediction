@@ -83,6 +83,10 @@ def compute_sample_weights(y: np.ndarray) -> np.ndarray:
     for cls, cnt in zip(classes, counts):
         class_weights[cls] = total / (n_classes * cnt)
 
+    if -1 in class_weights: class_weights[-1] *= 1.8
+    if 1 in class_weights: class_weights[1] *= 1.8
+    if 0 in class_weights: class_weights[0] *= 0.6
+
     weights = np.array([class_weights[yi] for yi in y])
 
     print(f"\n  Sinif agirliklari:")
@@ -256,6 +260,208 @@ def run_optuna_tuning(
 
 
 # --------------------------------------------------------------
+# BINARY RELEVANCE MODELS
+# --------------------------------------------------------------
+def optimize_threshold_balanced(y_true, y_proba, target_recall=0.40, min_precision=0.30):
+    """
+    Hem recall hem precision'ı dengeleyen threshold.
+    """
+    from sklearn.metrics import precision_score, recall_score
+    
+    thresholds = np.linspace(0.2, 0.9, 100)
+    best_threshold = 0.5
+    best_score = 0
+    
+    for thresh in thresholds:
+        y_pred = (y_proba >= thresh).astype(int)
+        
+        recall = recall_score(y_true, y_pred, zero_division=0)
+        precision = precision_score(y_true, y_pred, zero_division=0)
+        
+        if precision >= min_precision and recall >= target_recall * 0.8:
+            score = 2 * (precision * recall) / (precision + recall + 1e-8)
+            if score > best_score:
+                best_score = score
+                best_threshold = thresh
+    
+    return best_threshold
+
+def train_binary_relevance_models_v2(
+    X_train, y_train, X_val, y_val, X_test, y_test,
+    sample_weights, best_params
+):
+    """
+    Geliştirilmiş binary relevance - confidence filtering ile.
+    """
+    print(f"\n{'='*70}")
+    print("  BINARY RELEVANCE V2 (BALANCED)")
+    print(f"{'='*70}")
+    
+    print("\n[1/2] UP Detection Model")
+    
+    y_train_up = (y_train == 1).astype(int)
+    y_val_up = (y_val == 1).astype(int)
+    y_test_up = (y_test == 1).astype(int)
+    
+    weights_up = sample_weights.copy()
+    weights_up[y_train == 1] *= 2.5
+    
+    model_up = xgb.XGBClassifier(
+        objective='binary:logistic',
+        scale_pos_weight=np.sum(y_train_up == 0) / np.sum(y_train_up == 1) if np.sum(y_train_up == 1) > 0 else 1,
+        device='cuda',
+        tree_method='hist',
+        eval_metric='auc',
+        n_estimators=best_params.get('n_estimators', 500),
+        max_depth=best_params.get('max_depth', 6),
+        learning_rate=best_params.get('learning_rate', 0.1),
+        subsample=best_params.get('subsample', 0.8),
+        colsample_bytree=best_params.get('colsample_bytree', 0.8),
+        random_state=42,
+        verbosity=0,
+        early_stopping_rounds=30,
+    )
+    
+    model_up.fit(
+        X_train, y_train_up,
+        eval_set=[(X_val, y_val_up)],
+        sample_weight=weights_up,
+        verbose=False
+    )
+    
+    val_proba_up = model_up.predict_proba(X_val)[:, 1]
+    thresh_up = optimize_threshold_balanced(
+        y_val_up, val_proba_up, 
+        target_recall=0.35,
+        min_precision=0.15
+    )
+    print(f"  UP threshold (balanced): {thresh_up:.3f}")
+    
+    val_pred_up = (val_proba_up >= thresh_up).astype(int)
+    from sklearn.metrics import precision_score, recall_score, f1_score
+    val_precision_up = precision_score(y_val_up, val_pred_up, zero_division=0)
+    val_recall_up = recall_score(y_val_up, val_pred_up, zero_division=0)
+    val_f1_up = f1_score(y_val_up, val_pred_up, zero_division=0)
+    print(f"  UP Validation - Precision: {val_precision_up:.3f}, Recall: {val_recall_up:.3f}, F1: {val_f1_up:.3f}")
+    
+    print("\n[2/2] DOWN Detection Model")
+    
+    y_train_down = (y_train == -1).astype(int)
+    y_val_down = (y_val == -1).astype(int)
+    y_test_down = (y_test == -1).astype(int)
+    
+    weights_down = sample_weights.copy()
+    weights_down[y_train == -1] *= 2.5
+    
+    model_down = xgb.XGBClassifier(
+        objective='binary:logistic',
+        scale_pos_weight=np.sum(y_train_down == 0) / np.sum(y_train_down == 1) if np.sum(y_train_down == 1) > 0 else 1,
+        device='cuda',
+        tree_method='hist',
+        eval_metric='auc',
+        n_estimators=best_params.get('n_estimators', 500),
+        max_depth=best_params.get('max_depth', 6),
+        learning_rate=best_params.get('learning_rate', 0.1),
+        subsample=best_params.get('subsample', 0.8),
+        colsample_bytree=best_params.get('colsample_bytree', 0.8),
+        random_state=42,
+        verbosity=0,
+        early_stopping_rounds=30,
+    )
+    
+    model_down.fit(
+        X_train, y_train_down,
+        eval_set=[(X_val, y_val_down)],
+        sample_weight=weights_down,
+        verbose=False
+    )
+    
+    val_proba_down = model_down.predict_proba(X_val)[:, 1]
+    thresh_down = optimize_threshold_balanced(
+        y_val_down, val_proba_down, 
+        target_recall=0.35,
+        min_precision=0.15
+    )
+    print(f"  DOWN threshold (balanced): {thresh_down:.3f}")
+    
+    val_pred_down = (val_proba_down >= thresh_down).astype(int)
+    val_precision_down = precision_score(y_val_down, val_pred_down, zero_division=0)
+    val_recall_down = recall_score(y_val_down, val_pred_down, zero_division=0)
+    val_f1_down = f1_score(y_val_down, val_pred_down, zero_division=0)
+    print(f"  DOWN Validation - Precision: {val_precision_down:.3f}, Recall: {val_recall_down:.3f}, F1: {val_f1_down:.3f}")
+    
+    print("\n[3/3] Combining Predictions (with confidence filter)")
+    
+    test_proba_up = model_up.predict_proba(X_test)[:, 1]
+    test_proba_down = model_down.predict_proba(X_test)[:, 1]
+    
+    final_pred = np.zeros(len(y_test), dtype=int)
+    
+    MIN_CONFIDENCE_GAP = 0.05
+    
+    up_mask = test_proba_up >= thresh_up
+    down_mask = test_proba_down >= thresh_down
+    
+    final_pred[up_mask & ~down_mask] = 1
+    final_pred[down_mask & ~up_mask] = -1
+    
+    conflict_mask = up_mask & down_mask
+    if conflict_mask.sum() > 0:
+        up_conf = test_proba_up[conflict_mask]
+        down_conf = test_proba_down[conflict_mask]
+        
+        confident_up = (up_conf > down_conf + MIN_CONFIDENCE_GAP)
+        confident_down = (down_conf > up_conf + MIN_CONFIDENCE_GAP)
+        
+        conflict_indices = np.where(conflict_mask)[0]
+        final_pred[conflict_indices[confident_up]] = 1
+        final_pred[conflict_indices[confident_down]] = -1
+    
+    from sklearn.metrics import classification_report, f1_score, accuracy_score
+    print("\n" + "="*70)
+    print("  BINARY RELEVANCE V2 - TEST RESULTS")
+    print("="*70)
+    
+    print("\nClassification Report:")
+    print(classification_report(
+        y_test, final_pred,
+        target_names=['DOWN (-1)', 'NEUTRAL (0)', 'UP (+1)'],
+        digits=4
+    ))
+    
+    acc = accuracy_score(y_test, final_pred)
+    f1_macro = f1_score(y_test, final_pred, average='macro', zero_division=0)
+    f1_weighted = f1_score(y_test, final_pred, average='weighted', zero_division=0)
+    
+    print(f"\nOverall Metrics:")
+    print(f"  Accuracy:    {acc:.4f}")
+    print(f"  Macro F1:    {f1_macro:.4f}")
+    print(f"  Weighted F1: {f1_weighted:.4f}")
+    
+    for cls in [-1, 0, 1]:
+        if np.sum(y_test == cls) > 0:
+            cls_mask_true = (y_test == cls)
+            cls_mask_pred = (final_pred == cls)
+            
+            tp = np.sum(cls_mask_true & cls_mask_pred)
+            recall = tp / np.sum(cls_mask_true)
+            precision = tp / np.sum(cls_mask_pred) if np.sum(cls_mask_pred) > 0 else 0
+            
+            label = {-1: 'DOWN', 0: 'NEUTRAL', 1: 'UP'}.get(cls)
+            print(f"\n{label}:")
+            print(f"  Precision: {precision:.4f}")
+            print(f"  Recall:    {recall:.4f}")
+    
+    unique, counts = np.unique(final_pred, return_counts=True)
+    print(f"\nPrediction Distribution:")
+    for cls, cnt in zip(unique, counts):
+        label = {-1: 'DOWN', 0: 'NEUTRAL', 1: 'UP'}.get(cls, str(cls))
+        print(f"  {label:>8s}: {cnt:>6,} ({cnt/len(y_test)*100:5.1f}%)")
+    
+    return model_up, model_down, final_pred, thresh_up, thresh_down
+
+
+# --------------------------------------------------------------
 # FINAL MODEL EGITIMI
 # --------------------------------------------------------------
 def train_final_model(
@@ -418,16 +624,33 @@ def _plot_feature_importance(
 # MODEL KAYDETME / YUKLEME
 # --------------------------------------------------------------
 def save_model(
-    model: xgb.XGBClassifier,
+    model_up: xgb.XGBClassifier,
+    model_down: xgb.XGBClassifier,
     best_params: dict,
+    thresh_up: float,
+    thresh_down: float,
     output_dir: Path,
 ) -> None:
-    """Modeli diske kaydeder."""
+    """Modelleri ve threshold'ları diske kaydeder."""
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    model_path = output_dir / 'model.json'
-    model.save_model(str(model_path))
-    print(f"  Model kaydedildi -> {model_path}")
+    model_up_path = output_dir / 'model_up.json'
+    model_up.save_model(str(model_up_path))
+    
+    model_down_path = output_dir / 'model_down.json'
+    model_down.save_model(str(model_down_path))
+    
+    # Threshold'ları ve params'ları da kaydet
+    meta_path = output_dir / 'meta.json'
+    meta_data = {
+        'thresh_up': float(thresh_up),
+        'thresh_down': float(thresh_down),
+        'best_params': best_params
+    }
+    with open(meta_path, 'w', encoding='utf-8') as f:
+        json.dump(meta_data, f, indent=4)
+
+    print(f"  Modeller kaydedildi -> {output_dir}")
 
 
 def load_model(model_dir: Path) -> xgb.XGBClassifier:
@@ -486,7 +709,7 @@ def full_training_pipeline(
     baseline_model = train_baseline(X_train, y_train, X_val, y_val, sample_weights)
 
     if skip_tuning:
-        # Tuning atla, baseline parametreleriyle final model
+        # Tuning atla, baseline parametreleriyle devam et
         print(f"\n[4/6] Tuning atlandi (--skip-tuning)")
         best_params = {
             'n_estimators': 500,
@@ -495,7 +718,6 @@ def full_training_pipeline(
             'subsample': 0.8,
             'colsample_bytree': 0.8,
         }
-        final_model = baseline_model
     else:
         # 4. Optuna tuning
         print(f"\n[4/6] Hyperparameter tuning baslatiliyor...")
@@ -504,17 +726,16 @@ def full_training_pipeline(
             sample_weights, n_trials=n_trials, timeout=timeout,
         )
 
-        # 5. Final model
-        print(f"\n[5/6] Final model egitiliyor...")
-        final_model = train_final_model(
-            X_train, y_train, X_val, y_val,
-            sample_weights, best_params,
-        )
+    # 5. Binary Relevance Modelleri
+    print(f"\n[5/6] Binary Relevance Modelleri Egitiliyor...")
+    model_up, model_down, final_pred, thresh_up, thresh_down = train_binary_relevance_models_v2(
+        X_train, y_train, X_val, y_val, X_test, y_test,
+        sample_weights, best_params
+    )
 
-    # 6. Degerlendirme + Kaydetme
-    print(f"\n[6/6] Model degerlendiriliyor ve kaydediliyor...")
-    evaluate_model(final_model, X_test, y_test, feature_cols, output_dir)
-    save_model(final_model, best_params, output_dir)
+    # 6. Kaydetme
+    print(f"\n[6/6] Modeller kaydediliyor...")
+    save_model(model_up, model_down, best_params, thresh_up, thresh_down, output_dir)
 
     print(f'\n{"="*70}')
     print(f'  {timeframe.upper()} - EGITIM TAMAMLANDI')
