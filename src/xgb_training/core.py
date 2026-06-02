@@ -98,7 +98,7 @@ def compute_sample_weights(y: np.ndarray) -> np.ndarray:
 
 
 # --------------------------------------------------------------
-# TARGET LABEL MAPPING  (-1, 0, 1) -> (0, 1, 2)
+# TARGET LABEL MAPPING  
 # --------------------------------------------------------------
 def encode_labels(y: np.ndarray) -> np.ndarray:
     """XGBoost multi-class 0'dan baslayan label ister: -1->0, 0->1, 1->2"""

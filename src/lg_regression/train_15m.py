@@ -4,7 +4,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parents[2]))
 
-from src.lr_training.core import full_training_pipeline
+from src.lg_regression.core import full_training_pipeline
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Train Logistic Regression for 15m timeframe")
