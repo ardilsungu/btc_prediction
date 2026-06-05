@@ -127,6 +127,25 @@ def run_training(
             skip_tuning=skip_tuning,
         )
 
+def run_lr_training(
+    timeframes: list = None,
+    n_trials: int = 50,
+    skip_tuning: bool = False,
+) -> None:
+    print(f'\n{"#"*70}')
+    print('  ADIM 4b / 4 - LOGISTIC REGRESSION EGITIM')
+    print(f'{"#"*70}')
+
+    from lg_regression.core import full_training_pipeline
+
+    targets = timeframes or TIMEFRAMES
+
+    for tf in targets:
+        full_training_pipeline(
+            timeframe=tf,
+            n_trials=n_trials,
+            skip_tuning=skip_tuning,
+        )
 
 # --------------------------------------------------------------
 # MAIN
@@ -169,6 +188,11 @@ def main() -> None:
     # Adim 4: Model egitimi
     if not args.skip_train:
         run_training(
+            timeframes=timeframes,
+            n_trials=args.trials,
+            skip_tuning=args.skip_tuning,
+        )
+        run_lr_training(
             timeframes=timeframes,
             n_trials=args.trials,
             skip_tuning=args.skip_tuning,
