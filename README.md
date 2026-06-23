@@ -65,15 +65,15 @@ A machine-learning service that predicts the **direction of the next BTC/USDT ca
 | Hyperparameter tuning | Optuna | `>=3.6.0` |
 | Data | pandas | `2.2.2` |
 | Numerics | numpy | `1.26.4` |
-| Technical indicators | ta *(declared)* | unpinned |
+| Technical indicators | computed manually in `feature_engineering.py` | — |
 | Plotting | matplotlib / seaborn | `>=3.8.0` / `>=0.13.0` |
 | API framework | FastAPI | `>=0.110.0` |
 | ASGI server | Uvicorn (`[standard]`) | `>=0.29.0` |
-| Exchange data | ccxt *(declared)* / httpx | `>=4.3.0` / `>=0.27.0` |
+| Exchange data | httpx (Binance REST) | `>=0.27.0` |
 | Model persistence | joblib (LR) / XGBoost native JSON | — |
 | Frontend | Vanilla HTML + CSS + JavaScript (`fetch`) | — |
 
-> **Note on indicators & exchange access:** `ta` and `ccxt` are listed as dependencies, but the live code paths compute indicators manually in `feature_engineering.py` and fetch candles directly through `httpx` against the Binance `/api/v3/klines` endpoint (`binance_client.py`). They are kept for compatibility/experimentation.
+> **Note on indicators & exchange access:** Technical indicators are computed manually in `feature_engineering.py`, and candles are fetched directly through `httpx` against the Binance `/api/v3/klines` endpoint (`binance_client.py`) — no third-party indicator or exchange-wrapper library is required.
 
 <a id="architecture-en"></a>
 ## 🏗️ Architecture
@@ -443,15 +443,15 @@ Dört zaman diliminde (15m, 1h, 4h, 1d) **bir sonraki BTC/USDT mumunun yönünü
 | Hiperparametre ayarı | Optuna | `>=3.6.0` |
 | Veri | pandas | `2.2.2` |
 | Sayısal işlemler | numpy | `1.26.4` |
-| Teknik göstergeler | ta *(tanımlı)* | sürüm sabitlenmemiş |
+| Teknik göstergeler | `feature_engineering.py` içinde elle hesaplanır | — |
 | Grafik | matplotlib / seaborn | `>=3.8.0` / `>=0.13.0` |
 | API çatısı | FastAPI | `>=0.110.0` |
 | ASGI sunucusu | Uvicorn (`[standard]`) | `>=0.29.0` |
-| Borsa verisi | ccxt *(tanımlı)* / httpx | `>=4.3.0` / `>=0.27.0` |
+| Borsa verisi | httpx (Binance REST) | `>=0.27.0` |
 | Model saklama | joblib (LR) / XGBoost yerel JSON | — |
 | Önyüz | Saf HTML + CSS + JavaScript (`fetch`) | — |
 
-> **Göstergeler ve borsa erişimi hakkında not:** `ta` ve `ccxt` bağımlılık olarak listelenir, ancak canlı kod yolları göstergeleri `feature_engineering.py` içinde elle hesaplar ve mumları doğrudan `httpx` ile Binance `/api/v3/klines` uç noktasından çeker (`binance_client.py`). Bu paketler uyumluluk/deneme amacıyla korunmaktadır.
+> **Göstergeler ve borsa erişimi hakkında not:** Teknik göstergeler `feature_engineering.py` içinde elle hesaplanır ve mumlar doğrudan `httpx` ile Binance `/api/v3/klines` uç noktasından çekilir (`binance_client.py`) — üçüncü taraf bir gösterge veya borsa sarmalayıcı kütüphanesi gerekmez.
 
 <a id="mimari-tr"></a>
 ## 🏗️ Mimari
